@@ -1,3 +1,6 @@
 function showMessage() {
-  document.getElementById("status").textContent = "Button clicked successfully.";
+  const status = document.getElementById("status");
+  if (status) {
+    status.textContent = "Recipient feature is working properly now.";
+  }
 }
