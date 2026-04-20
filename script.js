@@ -1,3 +1,3 @@
 function showMessage() {
-  document.getElementById("status").textContent = "Button clicked successfully.";
+  document.getElementById("status").textContent = "Recipient feature working!";
 }
