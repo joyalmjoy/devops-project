@@ -1,0 +1,115 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'windows-latest'
+
+stages:
+- stage: Build
+  displayName: Build Stage
+  jobs:
+  - job: BuildJob
+    displayName: Build Job
+    steps:
+    - checkout: self
+      fetchDepth: 0
+
+    - task: NodeTool@0
+      displayName: Use Node.js
+      inputs:
+        versionSpec: '20.x'
+
+    - task: SonarQubePrepare@7
+      displayName: Prepare SonarQube Analysis
+      inputs:
+        SonarQube: 'SonarQubeServer'
+        scannerMode: 'cli'
+        configMode: 'manual'
+        cliProjectKey: 'devops-project'
+        cliProjectName: 'devops-project'
+        cliSources: '.'
+        extraProperties: |
+          sonar.sourceEncoding=UTF-8
+          sonar.javascript.lcov.reportPaths=coverage/lcov.info
+
+    - script: |
+        npm install
+      displayName: Install dependencies
+
+    - script: |
+        mkdir test-results
+        echo ^<testsuites^>^<testsuite name="demo" tests="1" failures="0"^>^<testcase classname="demo" name="sampleTest"/^>^</testsuite^>^</testsuites^> > test-results/results.xml
+        mkdir coverage
+        echo TN: > coverage/lcov.info
+        echo SF:index.js >> coverage/lcov.info
+        echo DA:1,1 >> coverage/lcov.info
+        echo end_of_record >> coverage/lcov.info
+      displayName: Generate demo test and coverage files
+
+    - task: PublishTestResults@2
+      displayName: Publish Test Results
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: 'test-results/results.xml'
+        failTaskOnFailedTests: true
+
+    - task: SonarQubeAnalyze@7
+      displayName: Run SonarQube Analysis
+
+    - task: SonarQubePublish@7
+      displayName: Publish Quality Gate
+      inputs:
+        pollingTimeoutSec: '300'
+
+- stage: Deliver
+  displayName: Deliver Stage
+  dependsOn: Build
+  jobs:
+  - job: DeliverJob
+    displayName: Deliver Job
+    steps:
+    - script: |
+        echo Releasing artifact...
+        mkdir "$(Build.ArtifactStagingDirectory)\app"
+        copy package.json "$(Build.ArtifactStagingDirectory)\app\"
+      displayName: Prepare Artifact
+
+    - publish: $(Build.ArtifactStagingDirectory)\app
+      artifact: drop
+      displayName: Publish Artifact
+
+- stage: DeployDev
+  displayName: Deploy to Dev Env
+  dependsOn: Deliver
+  jobs:
+  - job: DevDeploy
+    steps:
+    - script: echo Deploying to Dev environment...
+      displayName: Deploy Dev
+
+- stage: DeployQAT
+  displayName: Deploy to QAT Env
+  dependsOn: DeployDev
+  jobs:
+  - job: QATDeploy
+    steps:
+    - script: echo Deploying to QAT environment...
+      displayName: Deploy QAT
+
+- stage: DeployStaging
+  displayName: Deploy to Staging Env
+  dependsOn: DeployQAT
+  jobs:
+  - job: StagingDeploy
+    steps:
+    - script: echo Deploying to Staging environment...
+      displayName: Deploy Staging
+
+- stage: DeployProduction
+  displayName: Deploy to Production Env
+  dependsOn: DeployStaging
+  jobs:
+  - job: ProductionDeploy
+    steps:
+    - script: echo Deploying to Production environment...
+      displayName: Deploy Production
