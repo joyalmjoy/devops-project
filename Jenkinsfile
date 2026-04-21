@@ -39,10 +39,14 @@ pipeline {
         }
 
         stage('Deliver') {
-            steps {
-                echo 'Delivering artifact'
-            }
-        }
+    steps {
+        echo 'Creating artifact...'
+        writeFile file: 'artifact.txt', text: 'This is my build artifact'
+        archiveArtifacts artifacts: 'artifact.txt', fingerprint: true
+    }
+}
+
+
 
         stage('Deploy to Dev Env') {
             steps {
